@@ -1,0 +1,15 @@
+{
+  "name": "ecoflow-monorepo",
+  "private": true,
+  "main": "index.js",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace @ecoflow/api",
+    "dev:mobile": "npm run start --workspace @ecoflow/mobile",
+    "build": "npm run build --workspace @ecoflow/api",
+    "prisma:generate": "npm run prisma:generate --workspace @ecoflow/api"
+  }
+}

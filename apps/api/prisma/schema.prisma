@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PeriodType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum MeterStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum ReadingSource {
+  API
+  SENSOR
+  MANUAL
+}
+
+enum AlertType {
+  HIGH_CONSUMPTION
+  LEAK_SUSPECTED
+  ANOMALY_DETECTED
+  LIMIT_EXCEEDED
+  SYSTEM
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+}
+
+model User {
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  passwordHash  String
+  role          UserRole       @default(USER)
+  properties    Property[]
+  sessions      AuthSession[]
+  alerts        Alert[]
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("users")
+}
+
+model AuthSession {
+  id               String   @id @default(uuid())
+  userId           String
+  refreshTokenHash String
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("auth_sessions")
+}
+
+model Property {
+  id            String             @id @default(uuid())
+  userId        String
+  name          String
+  addressLine   String?
+  city          String?
+  state         String?
+  reference     String?
+  timezone      String             @default("America/Sao_Paulo")
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  waterMeters   WaterMeter[]
+  limits        ConsumptionLimit[]
+  alerts        Alert[]
+  notifications Notification[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("properties")
+}
+
+model WaterMeter {
+  id                   String               @id @default(uuid())
+  propertyId           String
+  name                 String
+  serialNumber         String               @unique
+  status               MeterStatus          @default(ACTIVE)
+  installedAt          DateTime?
+  calibrationFactor    Decimal              @default(1) @db.Decimal(8, 4)
+  thresholdProfileJson Json?
+  property             Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  readings             ConsumptionReading[]
+  limits               ConsumptionLimit[]
+  alerts               Alert[]
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([propertyId, status])
+  @@map("water_meters")
+}
+
+model ConsumptionReading {
+  id             String        @id @default(uuid())
+  waterMeterId   String
+  measuredLiters Decimal       @db.Decimal(12, 2)
+  meterReading   Decimal?      @db.Decimal(14, 2)
+  readingAt      DateTime
+  source         ReadingSource @default(API)
+  isEstimated    Boolean       @default(false)
+  anomalyScore   Decimal?      @db.Decimal(8, 4)
+  waterMeter     WaterMeter    @relation(fields: [waterMeterId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+
+  @@index([waterMeterId, readingAt(sort: Desc)])
+  @@map("consumption_readings")
+}
+
+model ConsumptionLimit {
+  id                 String      @id @default(uuid())
+  propertyId         String
+  waterMeterId       String?
+  createdByUserId    String
+  periodType         PeriodType
+  limitLiters        Decimal     @db.Decimal(12, 2)
+  warningPercentage  Int         @default(15)
+  criticalPercentage Int         @default(45)
+  minimumSampleSize  Int         @default(7)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  property           Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  waterMeter         WaterMeter? @relation(fields: [waterMeterId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, waterMeterId, periodType])
+  @@index([propertyId, periodType])
+  @@map("consumption_limits")
+}
+
+model Alert {
+  id             String         @id @default(uuid())
+  userId         String
+  propertyId     String
+  waterMeterId   String?
+  type           AlertType
+  severity       AlertSeverity
+  title          String
+  message        String
+  triggerValue   Decimal?       @db.Decimal(12, 2)
+  baselineValue  Decimal?       @db.Decimal(12, 2)
+  thresholdValue Decimal?       @db.Decimal(12, 2)
+  anomalyScore   Decimal?       @db.Decimal(8, 4)
+  metadata       Json?
+  detectedAt     DateTime       @default(now())
+  resolvedAt     DateTime?
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property       Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  waterMeter     WaterMeter?    @relation(fields: [waterMeterId], references: [id], onDelete: SetNull)
+  notifications  Notification[]
+
+  @@index([userId, severity, detectedAt(sort: Desc)])
+  @@index([propertyId, detectedAt(sort: Desc)])
+  @@map("alerts")
+}
+
+model Notification {
+  id          String              @id @default(uuid())
+  userId      String
+  propertyId  String?
+  alertId     String?
+  channel     NotificationChannel @default(IN_APP)
+  status      NotificationStatus  @default(PENDING)
+  title       String
+  body        String
+  payload     Json?
+  sentAt      DateTime?
+  readAt      DateTime?
+  createdAt   DateTime            @default(now())
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property    Property?           @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  alert       Alert?              @relation(fields: [alertId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, createdAt(sort: Desc)])
+  @@index([alertId])
+  @@map("notifications")
+}

@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "EcoFlow",
+    "slug": "ecoflow",
+    "scheme": "ecoflow",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/ecoflow-logo.png",
+    "splash": {
+      "image": "./assets/ecoflow-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F4FBFE"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/ecoflow-logo.png",
+        "backgroundColor": "#F4FBFE"
+      },
+      "package": "com.ecoflow.mobile"
+    },
+    "extra": {
+      "apiUrl": "http://localhost:3333/api",
+      "demoMode": true,
+      "demoUserEmail": "admin@gmail.com",
+      "demoUserPassword": "senha123"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}
