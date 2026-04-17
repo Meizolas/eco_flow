@@ -212,3 +212,9 @@ model Notification {
   @@index([alertId])
   @@map("notifications")
 }
+
+model WaterConsumption {
+  id        String   @id @default(uuid())
+  amount    Float    // Quantidade em litros
+  createdAt DateTime @default(now())
+}
