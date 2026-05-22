@@ -1,10 +1,14 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
+import { useNavigation } from "@react-navigation/native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { AppButton } from "../../components/app-button";
 import { ScreenContainer } from "../../components/screen-container";
 import { useAuthStore } from "../../store/auth-store";
+import { useLimitsStore } from "../../store/limits-store";
 import { theme } from "../../theme";
 
 const menuItems = [
@@ -30,8 +34,7 @@ const menuItems = [
     label: "Limites Configurados",
     icon: "options-outline" as const,
     iconColor: theme.colors.success,
-    iconBg: "rgba(29,156,122,0.1)",
-    value: "120 L"
+    iconBg: "rgba(29,156,122,0.1)"
   },
   {
     label: "Privacidade",
@@ -48,10 +51,75 @@ const menuItems = [
 ];
 
 export function ProfileScreen() {
+  const navigation = useNavigation<any>();
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
+  const profilePhotoUri = useAuthStore((state) => state.profilePhotoUri);
+  const setProfilePhotoUri = useAuthStore((state) => state.setProfilePhotoUri);
+  const updateUser = useAuthStore((state) => state.updateUser);
+  const storedDeviceName = useAuthStore((state) => state.deviceName);
+  const setStoredDeviceName = useAuthStore((state) => state.setDeviceName);
+  const monthlyLimitLiters = useLimitsStore((state) => state.monthlyLimitLiters);
+  const setMonthlyLimitLiters = useLimitsStore((state) => state.setMonthlyLimitLiters);
+  const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [editableName, setEditableName] = useState(user?.name ?? "");
+  const [editableEmail, setEditableEmail] = useState(user?.email ?? "");
+  const [deviceName, setDeviceName] = useState(storedDeviceName);
+  const [limitDraft, setLimitDraft] = useState(String(monthlyLimitLiters));
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [leakAlertsEnabled, setLeakAlertsEnabled] = useState(true);
 
   const firstName = user?.name?.split(" ")[0] ?? "Usuario";
+  const pickProfilePhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert("Permissao necessaria", "Autorize o acesso as fotos para escolher uma imagem de perfil.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.75
+    });
+
+    if (!result.canceled) {
+      setProfilePhotoUri(result.assets[0].uri);
+    }
+  };
+
+  const handleMenuPress = (label: string) => {
+    if (label === "Alertas e Notificacoes") {
+      navigation.navigate("AlertsTab");
+      return;
+    }
+
+    setActivePanel(label);
+  };
+
+  const saveAccount = () => {
+    updateUser({ name: editableName.trim() || user?.name, email: editableEmail.trim() || user?.email });
+    setActivePanel(null);
+  };
+
+  const saveLimit = async () => {
+    const nextLimit = Number(limitDraft.replace(",", "."));
+
+    if (!Number.isFinite(nextLimit) || nextLimit <= 0) {
+      Alert.alert("Limite invalido", "Informe um limite maior que zero.");
+      return;
+    }
+
+    await setMonthlyLimitLiters(nextLimit);
+    setActivePanel(null);
+  };
+
+  const saveDevice = () => {
+    setStoredDeviceName(deviceName.trim() || "Hidrometro Principal");
+    setActivePanel(null);
+  };
 
   return (
     <ScreenContainer>
@@ -79,18 +147,31 @@ export function ProfileScreen() {
           <View style={[styles.decorCircle, styles.decorCircle2]} />
 
           {/* Avatar com inicial do usuário */}
-          <View style={styles.avatarWrap}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Alterar foto de perfil"
+            activeOpacity={0.85}
+            onPress={pickProfilePhoto}
+            style={styles.avatarWrap}
+          >
             <View style={styles.avatarRing}>
-              <LinearGradient
-                colors={["#41C8E8", "#1668B8"]}
-                style={styles.avatarBg}
-              >
-                <Text style={styles.avatarInitial}>
-                  {(user?.name ?? "U")[0].toUpperCase()}
-                </Text>
-              </LinearGradient>
+              {profilePhotoUri ? (
+                <Image source={{ uri: profilePhotoUri }} style={styles.avatarPhoto} />
+              ) : (
+                <LinearGradient
+                  colors={["#41C8E8", "#1668B8"]}
+                  style={styles.avatarBg}
+                >
+                  <Text style={styles.avatarInitial}>
+                    {(user?.name ?? "U")[0].toUpperCase()}
+                  </Text>
+                </LinearGradient>
+              )}
             </View>
-          </View>
+            <View style={styles.avatarEditBadge}>
+              <Ionicons name="camera-outline" size={16} color={theme.colors.primary} />
+            </View>
+          </TouchableOpacity>
 
           {/* User info */}
           <Text style={styles.profileName}>{user?.name ?? "Usuario EcoFlow"}</Text>
@@ -121,6 +202,7 @@ export function ProfileScreen() {
         {menuItems.map((item, index) => (
           <TouchableOpacity
             key={item.label}
+            onPress={() => handleMenuPress(item.label)}
             style={[
               styles.menuItem,
               index < menuItems.length - 1 && styles.menuItemBorder
@@ -131,8 +213,8 @@ export function ProfileScreen() {
             </View>
             <Text style={styles.menuItemLabel}>{item.label}</Text>
             <View style={styles.menuItemRight}>
-              {item.value ? (
-                <Text style={styles.menuItemValue}>{item.value}</Text>
+              {item.label === "Limites Configurados" ? (
+                <Text style={styles.menuItemValue}>{monthlyLimitLiters} L</Text>
               ) : null}
               <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
             </View>
@@ -150,6 +232,114 @@ export function ProfileScreen() {
       <Animated.View entering={FadeInUp.delay(200).duration(440)}>
         <AppButton label="Sair da conta" onPress={signOut} variant="danger" style={styles.logout} />
       </Animated.View>
+
+      <Modal visible={activePanel != null} transparent animationType="fade" onRequestClose={() => setActivePanel(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setActivePanel(null)}>
+          <Pressable style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{activePanel}</Text>
+              <TouchableOpacity style={styles.modalClose} onPress={() => setActivePanel(null)}>
+                <Ionicons name="close" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalContent}>
+              {activePanel === "Dados da Conta" ? (
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.inputLabel}>Nome</Text>
+                    <TextInput value={editableName} onChangeText={setEditableName} style={styles.textInput} placeholder="Seu nome" />
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.inputLabel}>Email</Text>
+                    <TextInput value={editableEmail} onChangeText={setEditableEmail} style={styles.textInput} keyboardType="email-address" autoCapitalize="none" />
+                  </View>
+                  <View style={styles.summaryBox}>
+                    <Text style={styles.summaryText}>Conta ativa, monitoramento mensal e sincronizacao local do perfil habilitados.</Text>
+                  </View>
+                  <TouchableOpacity style={styles.primaryModalButton} onPress={saveAccount}>
+                    <Text style={styles.primaryModalButtonText}>Salvar dados</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+
+              {activePanel === "Meus Dispositivos" ? (
+                <>
+                  <View style={styles.deviceCard}>
+                    <View style={styles.deviceIcon}>
+                      <Ionicons name="hardware-chip-outline" size={22} color={theme.colors.info} />
+                    </View>
+                    <View style={styles.deviceInfo}>
+                      <Text style={styles.deviceTitle}>{deviceName}</Text>
+                      <Text style={styles.deviceMeta}>Online - enviando leituras via API</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.inputLabel}>Nome do dispositivo</Text>
+                  <TextInput value={deviceName} onChangeText={setDeviceName} style={styles.textInput} />
+                  <TouchableOpacity style={styles.primaryModalButton} onPress={saveDevice}>
+                    <Text style={styles.primaryModalButtonText}>Salvar dispositivo</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+
+              {activePanel === "Limites Configurados" ? (
+                <>
+                  <View style={styles.limitHighlight}>
+                    <Text style={styles.limitValue}>{monthlyLimitLiters}L</Text>
+                    <Text style={styles.limitCaption}>Limite mensal atual</Text>
+                  </View>
+                  <Text style={styles.inputLabel}>Novo limite mensal em litros</Text>
+                  <TextInput value={limitDraft} onChangeText={setLimitDraft} keyboardType="numeric" style={styles.textInput} />
+                  <View style={styles.summaryBox}>
+                    <Text style={styles.summaryText}>Aviso em 85% do limite e alerta critico quando houver suspeita de vazamento.</Text>
+                  </View>
+                  <TouchableOpacity style={styles.primaryModalButton} onPress={saveLimit}>
+                    <Text style={styles.primaryModalButtonText}>Atualizar limite</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+
+              {activePanel === "Privacidade" ? (
+                <>
+                  <View style={styles.privacyRow}>
+                    <View>
+                      <Text style={styles.privacyTitle}>Notificacoes push</Text>
+                      <Text style={styles.privacyText}>Permitir avisos importantes no celular.</Text>
+                    </View>
+                    <Switch value={pushEnabled} onValueChange={setPushEnabled} />
+                  </View>
+                  <View style={styles.privacyRow}>
+                    <View>
+                      <Text style={styles.privacyTitle}>Alertas de vazamento</Text>
+                      <Text style={styles.privacyText}>Priorizar eventos criticos de consumo.</Text>
+                    </View>
+                    <Switch value={leakAlertsEnabled} onValueChange={setLeakAlertsEnabled} />
+                  </View>
+                  <View style={styles.summaryBox}>
+                    <Text style={styles.summaryText}>Seus dados de consumo sao usados apenas para historico, alertas e analises do EcoFlow.</Text>
+                  </View>
+                </>
+              ) : null}
+
+              {activePanel === "Central de Ajuda" ? (
+                <>
+                  {[
+                    ["Como o consumo ao vivo funciona?", "O sensor ou simulador envia leituras para a API, e a dashboard busca atualizacoes automaticamente."],
+                    ["Nao consigo logar", "Confira se API e celular estao na mesma rede e se o apiUrl aponta para o IP do computador."],
+                    ["Quando recebo alertas?", "Quando o consumo passa do padrao esperado ou do limite configurado."]
+                  ].map(([title, body]) => (
+                    <View key={title} style={styles.helpItem}>
+                      <Text style={styles.helpTitle}>{title}</Text>
+                      <Text style={styles.helpBody}>{body}</Text>
+                    </View>
+                  ))}
+                </>
+              ) : null}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -233,6 +423,23 @@ const styles = StyleSheet.create({
   avatarBg: {
     flex: 1,
     borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  avatarPhoto: {
+    flex: 1,
+    borderRadius: 28
+  },
+  avatarEditBadge: {
+    position: "absolute",
+    right: -4,
+    bottom: -4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.card,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.75)",
     alignItems: "center",
     justifyContent: "center"
   },
@@ -344,5 +551,184 @@ const styles = StyleSheet.create({
   },
   logout: {
     marginTop: theme.spacing.lg
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(4,18,32,0.42)",
+    justifyContent: "flex-end",
+    padding: theme.spacing.lg
+  },
+  modalSheet: {
+    maxHeight: "86%",
+    backgroundColor: theme.colors.card,
+    borderRadius: 24,
+    padding: theme.spacing.lg,
+    ...theme.shadow.card
+  },
+  modalHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    borderRadius: 99,
+    backgroundColor: theme.colors.border,
+    marginBottom: theme.spacing.lg
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: theme.spacing.lg
+  },
+  modalTitle: {
+    flex: 1,
+    fontFamily: theme.typography.fonts.heading,
+    fontSize: theme.typography.sizes.xl,
+    color: theme.colors.text
+  },
+  modalClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.cardMuted
+  },
+  modalContent: {
+    gap: theme.spacing.md,
+    paddingBottom: theme.spacing.sm
+  },
+  infoRow: {
+    gap: theme.spacing.xs
+  },
+  inputLabel: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text
+  },
+  textInput: {
+    minHeight: 48,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: theme.spacing.md,
+    fontFamily: theme.typography.fonts.body,
+    fontSize: theme.typography.sizes.md,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background
+  },
+  summaryBox: {
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    backgroundColor: theme.colors.primarySoft,
+    borderWidth: 1,
+    borderColor: "rgba(185,225,242,0.8)"
+  },
+  summaryText: {
+    fontFamily: theme.typography.fonts.body,
+    fontSize: theme.typography.sizes.sm,
+    lineHeight: theme.typography.lineHeights.md,
+    color: theme.colors.text
+  },
+  primaryModalButton: {
+    minHeight: 48,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: theme.spacing.xs
+  },
+  primaryModalButtonText: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: theme.typography.sizes.md,
+    color: "#FFFFFF"
+  },
+  deviceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background
+  },
+  deviceIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(77,189,228,0.12)"
+  },
+  deviceInfo: {
+    flex: 1,
+    gap: 2
+  },
+  deviceTitle: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: theme.typography.sizes.md,
+    color: theme.colors.text
+  },
+  deviceMeta: {
+    fontFamily: theme.typography.fonts.body,
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.textMuted
+  },
+  limitHighlight: {
+    alignItems: "center",
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.secondary
+  },
+  limitValue: {
+    fontFamily: theme.typography.fonts.heading,
+    fontSize: 34,
+    color: "#FFFFFF"
+  },
+  limitCaption: {
+    fontFamily: theme.typography.fonts.body,
+    fontSize: theme.typography.sizes.sm,
+    color: "rgba(255,255,255,0.78)"
+  },
+  privacyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background
+  },
+  privacyTitle: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text
+  },
+  privacyText: {
+    maxWidth: 220,
+    fontFamily: theme.typography.fonts.body,
+    fontSize: theme.typography.sizes.xs,
+    color: theme.colors.textMuted
+  },
+  helpItem: {
+    gap: theme.spacing.xs,
+    borderRadius: theme.radius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background
+  },
+  helpTitle: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text
+  },
+  helpBody: {
+    fontFamily: theme.typography.fonts.body,
+    fontSize: theme.typography.sizes.sm,
+    lineHeight: theme.typography.lineHeights.md,
+    color: theme.colors.textMuted
   }
 });

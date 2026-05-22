@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { BarChart } from "react-native-gifted-charts";
@@ -11,24 +11,73 @@ import { theme } from "../../theme";
 const periods = ["Diario", "Semanal", "Mensal", "Anual"] as const;
 type Period = (typeof periods)[number];
 
-const data = [
-  { value: 120, label: "Seg", frontColor: theme.colors.primary, gradientColor: theme.colors.brand[300] },
-  { value: 85, label: "Ter", frontColor: theme.colors.primary, gradientColor: theme.colors.brand[300] },
-  { value: 190, label: "Qua", frontColor: theme.colors.warning, gradientColor: "#F8D585" },
-  { value: 260, label: "Qui", frontColor: theme.colors.danger, gradientColor: "#F2A6AF" },
-  { value: 170, label: "Sex", frontColor: theme.colors.primary, gradientColor: theme.colors.brand[300] },
-  { value: 220, label: "Sab", frontColor: theme.colors.warning, gradientColor: "#F8D585" }
-];
-
-const totalPeriod = data.reduce((s, d) => s + d.value, 0);
-const peak = Math.max(...data.map((d) => d.value));
-const minimum = Math.min(...data.map((d) => d.value));
-const avg = Math.round(totalPeriod / data.length);
+const periodData: Record<Period, Array<{ value: number; label: string }>> = {
+  Diario: [
+    { value: 8, label: "6h" },
+    { value: 18, label: "9h" },
+    { value: 12, label: "12h" },
+    { value: 22, label: "15h" },
+    { value: 16, label: "18h" },
+    { value: 10, label: "21h" }
+  ],
+  Semanal: [
+    { value: 120, label: "Seg" },
+    { value: 85, label: "Ter" },
+    { value: 190, label: "Qua" },
+    { value: 260, label: "Qui" },
+    { value: 170, label: "Sex" },
+    { value: 220, label: "Sab" },
+    { value: 140, label: "Dom" }
+  ],
+  Mensal: [
+    { value: 680, label: "S1" },
+    { value: 820, label: "S2" },
+    { value: 760, label: "S3" },
+    { value: 910, label: "S4" }
+  ],
+  Anual: [
+    { value: 2100, label: "Jan" },
+    { value: 1900, label: "Fev" },
+    { value: 2380, label: "Mar" },
+    { value: 2200, label: "Abr" },
+    { value: 2050, label: "Mai" },
+    { value: 1980, label: "Jun" }
+  ]
+};
 
 type Props = NativeStackScreenProps<HistoryStackParamList, "HistoryHome">;
 
 export function HistoryScreen({ navigation }: Props) {
+  const { width } = useWindowDimensions();
   const [activePeriod, setActivePeriod] = useState<Period>("Semanal");
+  const chartWidth = Math.max(220, width - theme.spacing.xl * 2 - theme.spacing.lg * 2 - 38);
+  const maxDataValue = Math.max(...periodData[activePeriod].map((entry) => entry.value));
+  const data = periodData[activePeriod].map((item) => {
+    const frontColor =
+      item.value >= maxDataValue * 0.9
+        ? theme.colors.danger
+        : item.value >= maxDataValue * 0.72
+          ? theme.colors.warning
+          : theme.colors.primary;
+
+    return {
+      ...item,
+      frontColor,
+      gradientColor:
+        frontColor === theme.colors.danger
+          ? "#F2A6AF"
+          : frontColor === theme.colors.warning
+            ? "#F8D585"
+            : theme.colors.brand[300]
+    };
+  });
+  const totalPeriod = data.reduce((s, d) => s + d.value, 0);
+  const peak = Math.max(...data.map((d) => d.value));
+  const minimum = Math.min(...data.map((d) => d.value));
+  const avg = Math.round(totalPeriod / data.length);
+  const peakLabel = data.find((item) => item.value === peak)?.label ?? "-";
+  const minimumLabel = data.find((item) => item.value === minimum)?.label ?? "-";
+  const goal = activePeriod === "Diario" ? 120 : activePeriod === "Semanal" ? 840 : activePeriod === "Mensal" ? 1200 : 14400;
 
   return (
     <ScreenContainer>
@@ -65,25 +114,51 @@ export function HistoryScreen({ navigation }: Props) {
             <Text style={styles.chartBadgeText}>{activePeriod}</Text>
           </View>
         </View>
-        <BarChart
-          data={data}
-          yAxisColor={theme.colors.border}
-          xAxisColor={theme.colors.border}
-          barBorderRadius={10}
-          hideRules={false}
-          rulesColor={theme.colors.border}
-          isAnimated
-          yAxisTextStyle={{
-            color: theme.colors.textMuted,
-            fontSize: 11,
-            fontFamily: theme.typography.fonts.body
-          }}
-          xAxisLabelTextStyle={{
-            color: theme.colors.textMuted,
-            fontSize: 11,
-            fontFamily: theme.typography.fonts.body
-          }}
-        />
+        <View style={styles.chartViewport}>
+          <BarChart
+            data={data}
+            width={chartWidth}
+            height={210}
+            barWidth={activePeriod === "Mensal" ? 34 : 24}
+            spacing={
+              activePeriod === "Mensal"
+                ? Math.max(16, (chartWidth - 34 * data.length) / Math.max(data.length - 1, 1))
+                : Math.max(10, (chartWidth - 24 * data.length) / Math.max(data.length - 1, 1))
+            }
+            initialSpacing={4}
+            endSpacing={4}
+            disableScroll
+            showGradient
+            gradientColor="rgba(255,255,255,0.18)"
+            yAxisColor="transparent"
+            xAxisColor={theme.colors.border}
+            yAxisThickness={0}
+            xAxisThickness={1}
+            yAxisLabelWidth={32}
+            noOfSections={5}
+            maxValue={Math.ceil((maxDataValue * 1.12) / 10) * 10}
+            barBorderTopLeftRadius={12}
+            barBorderTopRightRadius={12}
+            barBorderBottomLeftRadius={8}
+            barBorderBottomRightRadius={8}
+            hideRules={false}
+            rulesColor="rgba(204,226,237,0.75)"
+            rulesType="dashed"
+            dashWidth={4}
+            dashGap={6}
+            isAnimated
+            yAxisTextStyle={{
+              color: theme.colors.textMuted,
+              fontSize: 10,
+              fontFamily: theme.typography.fonts.body
+            }}
+            xAxisLabelTextStyle={{
+              color: theme.colors.textMuted,
+              fontSize: 10,
+              fontFamily: theme.typography.fonts.body
+            }}
+          />
+        </View>
       </Animated.View>
 
       {/* Stats grid */}
@@ -92,7 +167,7 @@ export function HistoryScreen({ navigation }: Props) {
           {
             label: "Pico",
             value: `${peak}L`,
-            caption: "Quinta-feira",
+            caption: peakLabel,
             icon: "trending-up-outline" as const,
             iconColor: theme.colors.danger,
             iconBg: "rgba(230,86,98,0.1)"
@@ -100,7 +175,7 @@ export function HistoryScreen({ navigation }: Props) {
           {
             label: "Minimo",
             value: `${minimum}L`,
-            caption: "Terca-feira",
+            caption: minimumLabel,
             icon: "trending-down-outline" as const,
             iconColor: theme.colors.success,
             iconBg: "rgba(29,156,122,0.1)"
@@ -148,9 +223,11 @@ export function HistoryScreen({ navigation }: Props) {
 
         {/* Progress bar */}
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${Math.min((totalPeriod / 1200) * 100, 100)}%` }]} />
+          <View style={[styles.progressFill, { width: `${Math.min((totalPeriod / goal) * 100, 100)}%` }]} />
         </View>
-        <Text style={styles.progressLabel}>vs meta mensal de 1.200L</Text>
+        <Text style={styles.progressLabel}>
+          vs meta do periodo de {goal.toLocaleString("pt-BR")}L
+        </Text>
       </Animated.View>
 
       {/* Detail button */}
@@ -159,9 +236,13 @@ export function HistoryScreen({ navigation }: Props) {
           style={styles.detailButton}
           onPress={() => navigation.navigate("ConsumptionDetails")}
         >
-          <Ionicons name="bar-chart-outline" size={18} color="#FFFFFF" />
+          <View style={styles.detailIconSlot}>
+            <Ionicons name="bar-chart-outline" size={18} color="#FFFFFF" />
+          </View>
           <Text style={styles.detailButtonText}>Ver analise detalhada</Text>
-          <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+          <View style={styles.detailIconSlot}>
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+          </View>
         </TouchableOpacity>
       </Animated.View>
     </ScreenContainer>
@@ -228,7 +309,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    gap: theme.spacing.md,
+    gap: theme.spacing.lg,
     shadowColor: "#123D5E",
     shadowOpacity: 0.07,
     shadowOffset: { width: 0, height: 8 },
@@ -368,22 +449,38 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xl,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: theme.spacing.sm,
+    justifyContent: "space-between",
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.secondary,
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.lg,
+    minHeight: 58,
     shadowColor: theme.colors.secondary,
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 6 },
     shadowRadius: 14,
     elevation: 6
   },
+  chartViewport: {
+    width: "100%",
+    overflow: "hidden",
+    alignItems: "center",
+    borderRadius: theme.radius.md,
+    paddingTop: theme.spacing.xs,
+    backgroundColor: "rgba(249,253,255,0.62)"
+  },
+  detailIconSlot: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center"
+  },
   detailButtonText: {
     fontFamily: theme.typography.fonts.bodySemiBold,
     fontSize: theme.typography.sizes.md,
     color: "#FFFFFF",
     flex: 1,
-    textAlign: "center"
+    textAlign: "center",
+    paddingHorizontal: theme.spacing.sm
   }
 });

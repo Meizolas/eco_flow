@@ -1,7 +1,8 @@
-import { useEffect } from "react";
-import { ActivityIndicator, Dimensions, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Dimensions, Image, Modal, Pressable, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation } from "@react-navigation/native";
 import { LineChart } from "react-native-gifted-charts";
 import Animated, {
   Easing,
@@ -19,7 +20,7 @@ import Svg, {
 } from "react-native-svg";
 import { ScreenContainer } from "../../components/screen-container";
 import { useAuthStore } from "../../store/auth-store";
-import { useDashboardSummary } from "../../hooks/use-dashboard-summary";
+import { useDashboardSummary, useNotifications } from "../../hooks/use-dashboard-summary";
 import { theme } from "../../theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -156,12 +157,31 @@ const gaugeStyles = StyleSheet.create({
 });
 
 export function DashboardScreen() {
+  const { width } = useWindowDimensions();
   const user = useAuthStore((state) => state.user);
+  const profilePhotoUri = useAuthStore((state) => state.profilePhotoUri);
   const summaryQuery = useDashboardSummary();
+  const notificationsQuery = useNotifications();
   const summary = summaryQuery.data ?? fallbackSummary;
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notifications = notificationsQuery.data ?? summary.activeAlerts.map((alert) => ({
+    id: alert.id,
+    title: alert.title,
+    body: alert.severity === "CRITICAL" ? "Verifique possivel vazamento agora." : "Consumo acima do padrao recente.",
+    status: "PENDING" as const,
+    createdAt: new Date().toISOString()
+  }));
 
-  const chartData = [52, 66, 60, 85, 74, 95, 82].map((value) => ({
-    value,
+  const chartData = [
+    { value: 52, label: "Seg" },
+    { value: 66, label: "Ter" },
+    { value: 60, label: "Qua" },
+    { value: 85, label: "Qui" },
+    { value: 74, label: "Sex" },
+    { value: 95, label: "Sab" },
+    { value: 82, label: "Dom" }
+  ].map((item) => ({
+    ...item,
     dataPointColor: theme.colors.brand[300]
   }));
 
@@ -177,6 +197,7 @@ export function DashboardScreen() {
     summary.status === "critical" ? "Critico" : summary.status === "attention" ? "Atencao" : "Estavel";
 
   const firstName = user?.name?.split(" ")[0] ?? "Usuario";
+  const chartWidth = Math.max(220, width - theme.spacing.xl * 2 - theme.spacing.lg * 2 - 36);
 
   return (
     <ScreenContainer>
@@ -187,7 +208,12 @@ export function DashboardScreen() {
           <Text style={styles.headerSub}>Acompanhe seu consumo</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Abrir notificacoes"
+            onPress={() => setNotificationsOpen(true)}
+            style={styles.iconButton}
+          >
             <Ionicons name="notifications-outline" size={22} color={theme.colors.secondary} />
             {summary.activeAlerts.length > 0 && (
               <View style={styles.notifBadge}>
@@ -196,7 +222,11 @@ export function DashboardScreen() {
             )}
           </TouchableOpacity>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{firstName[0]?.toUpperCase()}</Text>
+            {profilePhotoUri ? (
+              <Image source={{ uri: profilePhotoUri }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{firstName[0]?.toUpperCase()}</Text>
+            )}
           </View>
         </View>
       </Animated.View>
@@ -352,25 +382,41 @@ export function DashboardScreen() {
             <Text style={styles.legendText}>Litros/dia</Text>
           </View>
         </View>
-        <LineChart
-          data={chartData}
-          areaChart
-          hideDataPoints={false}
-          color={theme.colors.primary}
-          startFillColor="rgba(37,119,191,0.28)"
-          endFillColor="rgba(121,221,241,0.04)"
-          yAxisColor={theme.colors.border}
-          xAxisColor={theme.colors.border}
-          noOfSections={4}
-          thickness={3}
-          hideRules={false}
-          rulesColor={theme.colors.border}
-          isAnimated
-          dataPointsColor={theme.colors.primary}
-          dataPointsRadius={4}
-          yAxisTextStyle={{ color: theme.colors.textMuted, fontSize: 11, fontFamily: theme.typography.fonts.body }}
-          xAxisLabelTextStyle={{ color: theme.colors.textMuted, fontSize: 11, fontFamily: theme.typography.fonts.body }}
-        />
+        <View style={styles.chartViewport}>
+          <LineChart
+            data={chartData}
+            areaChart
+            width={chartWidth}
+            height={178}
+            initialSpacing={4}
+            spacing={(chartWidth - 10) / 6}
+            endSpacing={4}
+            hideDataPoints={false}
+            color={theme.colors.primary}
+            startFillColor="rgba(37,119,191,0.72)"
+            endFillColor="rgba(77,189,228,0.18)"
+            yAxisColor="transparent"
+            xAxisColor={theme.colors.border}
+            yAxisThickness={0}
+            xAxisThickness={1}
+            yAxisLabelWidth={30}
+            noOfSections={4}
+            thickness={3}
+            hideRules={false}
+            rulesColor="rgba(204,226,237,0.75)"
+            rulesType="dashed"
+            dashWidth={4}
+            dashGap={6}
+            isAnimated
+            dataPointsColor={theme.colors.brand[300]}
+            dataPointsRadius={4}
+            curved
+            disableScroll
+            maxValue={110}
+            yAxisTextStyle={{ color: theme.colors.textMuted, fontSize: 10, fontFamily: theme.typography.fonts.body }}
+            xAxisLabelTextStyle={{ color: theme.colors.textMuted, fontSize: 10, fontFamily: theme.typography.fonts.body }}
+          />
+        </View>
       </Animated.View>
 
       {/* Smart tip */}
@@ -425,6 +471,51 @@ export function DashboardScreen() {
           ))}
         </Animated.View>
       )}
+
+      <Modal
+        visible={notificationsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNotificationsOpen(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setNotificationsOpen(false)}>
+          <Pressable style={styles.notificationSheet}>
+            <View style={styles.notificationHandle} />
+            <View style={styles.notificationHeader}>
+              <View>
+                <Text style={styles.notificationEyebrow}>CENTRAL</Text>
+                <Text style={styles.notificationTitle}>Notificacoes</Text>
+              </View>
+              <TouchableOpacity style={styles.modalClose} onPress={() => setNotificationsOpen(false)}>
+                <Ionicons name="close" size={20} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.notificationList}>
+              {notifications.slice(0, 4).map((item) => (
+                <View key={item.id} style={styles.notificationItem}>
+                  <View style={styles.notificationIcon}>
+                    <Ionicons
+                      name={item.title.toLowerCase().includes("critico") ? "alert-circle" : "notifications-outline"}
+                      size={20}
+                      color={item.title.toLowerCase().includes("critico") ? theme.colors.danger : theme.colors.primary}
+                    />
+                  </View>
+                  <View style={styles.notificationContent}>
+                    <Text style={styles.notificationItemTitle}>{item.title}</Text>
+                    <Text style={styles.notificationBody} numberOfLines={2}>{item.body}</Text>
+                  </View>
+                  <View style={styles.notificationUnreadDot} />
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.notificationAction} onPress={() => setNotificationsOpen(false)}>
+              <Text style={styles.notificationActionText}>Entendi</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -495,6 +586,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,
     elevation: 4
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 21
   },
   avatarText: {
     fontFamily: theme.typography.fonts.heading,
@@ -678,6 +774,11 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 4
   },
+  chartViewport: {
+    width: "100%",
+    overflow: "hidden",
+    alignItems: "center"
+  },
   chartHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -804,5 +905,102 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fonts.body,
     fontSize: theme.typography.sizes.xs,
     color: theme.colors.textMuted
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(4,18,32,0.42)",
+    justifyContent: "flex-end",
+    padding: theme.spacing.lg
+  },
+  notificationSheet: {
+    backgroundColor: theme.colors.card,
+    borderRadius: 24,
+    padding: theme.spacing.lg,
+    gap: theme.spacing.lg,
+    ...theme.shadow.card
+  },
+  notificationHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    borderRadius: 99,
+    backgroundColor: theme.colors.border
+  },
+  notificationHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center"
+  },
+  notificationEyebrow: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    color: theme.colors.primary
+  },
+  notificationTitle: {
+    fontFamily: theme.typography.fonts.heading,
+    fontSize: theme.typography.sizes.xl,
+    color: theme.colors.text
+  },
+  modalClose: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.cardMuted
+  },
+  notificationList: {
+    gap: theme.spacing.md
+  },
+  notificationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border
+  },
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primarySoft
+  },
+  notificationContent: {
+    flex: 1,
+    gap: 2
+  },
+  notificationItemTitle: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text
+  },
+  notificationBody: {
+    fontFamily: theme.typography.fonts.body,
+    fontSize: theme.typography.sizes.xs,
+    lineHeight: 18,
+    color: theme.colors.textMuted
+  },
+  notificationUnreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 99,
+    backgroundColor: theme.colors.danger
+  },
+  notificationAction: {
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+    alignItems: "center"
+  },
+  notificationActionText: {
+    fontFamily: theme.typography.fonts.bodySemiBold,
+    fontSize: theme.typography.sizes.md,
+    color: "#FFFFFF"
   }
 });
