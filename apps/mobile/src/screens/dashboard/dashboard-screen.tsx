@@ -32,7 +32,7 @@ const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const fallbackSummary = {
   propertyName: "Residencia Principal",
-  totalConsumptionLiters: 120,
+  totalConsumptionLiters: 45.5,
   averageConsumptionLiters: 100,
   previousPeriodConsumptionLiters: 96,
   comparisonPercentage: 25,

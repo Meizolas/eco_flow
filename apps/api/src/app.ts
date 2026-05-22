@@ -1,3 +1,4 @@
+import { consumptionRoutes } from "./routes/consumption-routes"
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import sensible from "@fastify/sensible";
@@ -39,6 +40,8 @@ export const buildApp = () => {
   });
 
   app.register(registerRoutes, { prefix: "/api" });
+
+  app.register(consumptionRoutes)
 
   return app;
 };
