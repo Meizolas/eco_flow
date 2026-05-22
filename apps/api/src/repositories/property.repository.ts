@@ -15,7 +15,11 @@ export const propertyRepository = {
     return prisma.property.create({
       data: {
         userId,
-        ...input
+        name: input.name,
+        addressLine: input.addressLine,
+        city: input.city,
+        state: input.state,
+        reference: input.reference
       }
     });
   },

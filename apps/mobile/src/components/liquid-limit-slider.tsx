@@ -207,7 +207,10 @@ export function LiquidLimitSlider({
   }));
 
   const thumbStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: fillWidth.value - THUMB_SIZE / 2 }, { scale: 1 + pressed.value * 0.08 }]
+    transform: [
+      { translateX: fillWidth.value - THUMB_SIZE / 2 },
+      { scale: 1 + pressed.value * 0.08 }
+    ] as const
   }));
 
   const handleLayout = (event: LayoutChangeEvent) => {

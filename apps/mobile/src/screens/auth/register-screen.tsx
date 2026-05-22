@@ -1,4 +1,4 @@
-import { Controller, useForm } from "react-hook-form";
+import { Controller, Resolver, useForm } from "react-hook-form";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,7 +25,12 @@ const registerSchema = z
     path: ["confirmPassword"]
   });
 
-type RegisterForm = z.infer<typeof registerSchema>;
+type RegisterForm = {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
 type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
 
 export function RegisterScreen({ navigation }: Props) {
@@ -35,11 +40,11 @@ export function RegisterScreen({ navigation }: Props) {
     handleSubmit,
     formState: { errors, isSubmitting }
   } = useForm<RegisterForm>({
-    resolver: zodResolver(registerSchema)
+    resolver: zodResolver(registerSchema) as unknown as Resolver<RegisterForm>
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    const result = await authApi.register(values);
+    const result = await authApi.register(values as unknown as RegisterForm);
     setSession({
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,

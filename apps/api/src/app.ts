@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import sensible from "@fastify/sensible";
 import Fastify from "fastify";
+import type { FastifyError } from "fastify";
 import { env } from "./config/env";
 import { registerRoutes } from "./routes";
 
@@ -25,11 +26,11 @@ export const buildApp = () => {
     await request.jwtVerify();
   });
 
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     request.log.error(error);
 
-    if ("statusCode" in error) {
-      return reply.status(error.statusCode ?? 400).send({
+    if (error.statusCode) {
+      return reply.status(error.statusCode).send({
         message: error.message
       });
     }

@@ -11,4 +11,15 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default("*")
 });
 
-export const env = envSchema.parse(process.env);
+type Env = {
+  NODE_ENV: "development" | "test" | "production";
+  PORT: number;
+  DATABASE_URL: string;
+  JWT_SECRET: string;
+  JWT_REFRESH_SECRET: string;
+  JWT_EXPIRES_IN: string;
+  JWT_REFRESH_EXPIRES_IN: string;
+  CORS_ORIGIN: string;
+};
+
+export const env = envSchema.parse(process.env) as Env;

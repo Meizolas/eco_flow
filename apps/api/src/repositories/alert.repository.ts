@@ -1,4 +1,10 @@
-import { AlertSeverity, AlertType, NotificationChannel, NotificationStatus } from "@prisma/client";
+import {
+  AlertSeverity,
+  AlertType,
+  NotificationChannel,
+  NotificationStatus,
+  Prisma
+} from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 export const alertRepository = {
@@ -14,7 +20,7 @@ export const alertRepository = {
     baselineValue?: number;
     thresholdValue?: number;
     anomalyScore?: number;
-    metadata?: Record<string, unknown>;
+    metadata?: Prisma.InputJsonObject;
   }) {
     return prisma.alert.create({
       data: {

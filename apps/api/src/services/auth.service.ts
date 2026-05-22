@@ -78,7 +78,7 @@ export class AuthService {
     ipAddress?: string
   ) {
     const accessToken = await this.app.jwt.sign(
-      { email, role },
+      { sub: userId, email, role },
       {
         sub: userId,
         expiresIn: this.app.config.JWT_EXPIRES_IN
@@ -86,10 +86,10 @@ export class AuthService {
     );
 
     const refreshToken = await this.app.jwt.sign(
-      { email, role, type: "refresh" },
+      { sub: userId, email, role, type: "refresh" },
       {
         sub: userId,
-        secret: this.app.config.JWT_REFRESH_SECRET,
+        key: this.app.config.JWT_REFRESH_SECRET,
         expiresIn: this.app.config.JWT_REFRESH_EXPIRES_IN
       }
     );

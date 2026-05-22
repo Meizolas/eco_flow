@@ -40,7 +40,7 @@ const tabIcons: Record<keyof AppTabParamList, { active: keyof typeof Ionicons.gl
 
 function HistoryStackNavigator() {
   return (
-    <HistoryStack.Navigator screenOptions={{ headerShown: false }}>
+    <HistoryStack.Navigator id="HistoryStack" screenOptions={{ headerShown: false }}>
       <HistoryStack.Screen name="HistoryHome" component={HistoryScreen} />
       <HistoryStack.Screen name="ConsumptionDetails" component={ConsumptionDetailsScreen} />
     </HistoryStack.Navigator>
@@ -50,6 +50,7 @@ function HistoryStackNavigator() {
 function AppTabs() {
   return (
     <Tab.Navigator
+      id="AppTabs"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
@@ -106,7 +107,7 @@ function AppTabs() {
 
 function AuthNavigator() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Login">
+    <AuthStack.Navigator id="AuthStack" screenOptions={{ headerShown: false }} initialRouteName="Login">
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Register" component={RegisterScreen} />
       <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />

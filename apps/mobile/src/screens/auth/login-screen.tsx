@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, Resolver, useForm } from "react-hook-form";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,7 +19,10 @@ const loginSchema = z.object({
   password: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres.")
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type LoginForm = {
+  email: string;
+  password: string;
+};
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: Props) {
@@ -30,7 +33,7 @@ export function LoginScreen({ navigation }: Props) {
     handleSubmit,
     formState: { errors }
   } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(loginSchema) as unknown as Resolver<LoginForm>,
     defaultValues: {
       email: appConfig.demoMode ? appConfig.demoUserEmail : "",
       password: appConfig.demoMode ? appConfig.demoUserPassword : ""
@@ -120,7 +123,7 @@ export function LoginScreen({ navigation }: Props) {
 
         <AppButton
           label={loginMutation.isPending ? "Entrando..." : "Entrar"}
-          onPress={handleSubmit((values) => loginMutation.mutate(values))}
+          onPress={handleSubmit((values) => loginMutation.mutate(values as unknown as LoginForm))}
           disabled={loginMutation.isPending}
         />
 

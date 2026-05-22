@@ -22,20 +22,35 @@ export const limitRepository = {
       orderBy: [{ waterMeterId: "desc" }, { updatedAt: "desc" }]
     });
   },
-  upsert(createdByUserId: string, input: UpsertLimitInput) {
-    return prisma.consumptionLimit.upsert({
+  async upsert(createdByUserId: string, input: UpsertLimitInput) {
+    const existingLimit = await prisma.consumptionLimit.findFirst({
       where: {
-        propertyId_waterMeterId_periodType: {
-          propertyId: input.propertyId,
-          waterMeterId: input.waterMeterId ?? null,
-          periodType: input.periodType
+        propertyId: input.propertyId,
+        waterMeterId: input.waterMeterId ?? null,
+        periodType: input.periodType
+      }
+    });
+
+    if (existingLimit) {
+      return prisma.consumptionLimit.update({
+        where: {
+          id: existingLimit.id
+        },
+        data: {
+          limitLiters: input.limitLiters,
+          warningPercentage: input.warningPercentage,
+          criticalPercentage: input.criticalPercentage,
+          minimumSampleSize: input.minimumSampleSize
         }
-      },
-      create: {
+      });
+    }
+
+    return prisma.consumptionLimit.create({
+      data: {
         createdByUserId,
-        ...input
-      },
-      update: {
+        propertyId: input.propertyId,
+        waterMeterId: input.waterMeterId,
+        periodType: input.periodType,
         limitLiters: input.limitLiters,
         warningPercentage: input.warningPercentage,
         criticalPercentage: input.criticalPercentage,
